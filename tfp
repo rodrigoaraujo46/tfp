@@ -1,0 +1,84 @@
+#!/bin/sh
+
+usage() {
+    echo "Usage: tfp <search> [-n|--no-vscode]"
+    echo
+    echo "Search for a project and open its tmux session."
+    echo
+    echo "Options:"
+    echo "  -n, --no-vscode    Don't open the project in VS Code"
+    echo "  -h, --help         Show this help"
+}
+
+CODE=1
+SEARCH=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -n|--no-vscode)
+            CODE=0
+            shift
+            ;;
+        -*)
+            echo "Error: unknown option: $1" >&2
+            exit 1
+            ;;
+        *)
+            if [ -n "$SEARCH" ]; then
+                echo "Error: only one search term is allowed" >&2
+                exit 1
+            fi
+            SEARCH=$1
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$SEARCH" ]; then
+    usage
+    exit 1
+fi
+
+RESULT=$(ssh "${USER}@u3" "fp '$SEARCH'") || {
+    echo "Error: failed to connect to u3" >&2
+    exit 1
+}
+
+INDEX=$(printf '%s\n' "$RESULT" |
+    awk 'BEGIN { RS="" } { first=$0; sub(/\n.*/, "", first); print first }' |
+    tac |
+    fzf) || exit 0
+
+SELECTED=$(printf '%s\n' "$RESULT" |
+    awk -v h="$INDEX" 'BEGIN { RS="" } {
+        first=$0
+        sub(/\n.*/, "", first)
+        if (first == h) { print; exit }
+    }')
+
+
+NAME=$(printf '%s\n' "$SELECTED" | sed -n '1s|.*/||p')
+LOGS=$(printf '%s\n' "$SELECTED" | sed -n '2p')
+CD=$(printf '%s\n' "$SELECTED" | sed -n '4p')
+DIR="/${CD#*/}"
+
+if ! tmux has-session -t "$NAME" 2>/dev/null; then
+    tmux new-session -d -s "$NAME" -n logs "$LOGS; exec bash"
+    tmux set -g status-left-length 100
+    tmux new-window -t "${NAME}:" -n opencode "$CD && opencode; exec bash"
+    tmux new-window -t "${NAME}:" -n shell
+fi
+
+if [ "$CODE" -eq 1 ]; then
+    code "$DIR" >/dev/null 2>&1 &
+fi
+
+if [ -n "$TMUX" ]; then
+    tmux switch-client -t "$NAME"
+else
+    tmux attach -t "$NAME"
+fi
