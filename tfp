@@ -70,7 +70,7 @@ if ! tmux has-session -t "$NAME" 2>/dev/null; then
     tmux new-session -d -s "$NAME" -n logs "$LOGS; exec bash"
     tmux set -g status-left-length 100
     tmux new-window -t "${NAME}:" -n opencode "$CD && opencode; exec bash"
-    tmux new-window -t "${NAME}:" -n shell
+    tmux new-window -t "${NAME}:" -n shell "$CD; exec bash"
 fi
 
 if [ "$CODE" -eq 1 ]; then
