@@ -1,6 +1,6 @@
 # tfp
 
-A small terminal utility for quickly finding and opening projects using `fzf`.
+A small terminal utility for quickly finding and opening projects using `fzf` and `tmux`.
 
 ## Dependencies
 
